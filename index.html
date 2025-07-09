@@ -1,837 +1,384 @@
+
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Graph.AI</title>
+    <title>Data Visualizer AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'brand-bg': '#1a1a1a',
+              'brand-surface': '#2a2a2e',
+              'brand-border': '#404044',
+              'brand-text': '#f0f0f0',
+              'brand-text-secondary': '#a0a0a4',
+              'brand-primary': '#6366f1',
+              'brand-primary-hover': '#4f46e5',
+            }
+          }
+        }
+      }
+    </script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@^19.1.0",
-    "react-dom/client": "https://esm.sh/react-dom@^19.1.0/client",
-    "@google/genai": "https://esm.sh/@google/genai",
-    "html2canvas": "https://esm.sh/html2canvas@^1.4.1",
+    "react": "https://esm.sh/react@18.3.1",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+    "@google/genai": "https://esm.sh/@google/genai@^1.8.0",
     "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
     "react/": "https://esm.sh/react@^19.1.0/"
   }
 }
 </script>
   </head>
-  <body class="bg-gray-100">
+  <body class="bg-brand-bg text-brand-text">
     <div id="root"></div>
-    <script type="module">
-      import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-      import ReactDOM from 'react-dom/client';
-      import { GoogleGenAI } from '@google/genai';
-      import html2canvas from 'html2canvas';
-
-      // --- ICONS ---
-      const LogoIcon = () => React.createElement("svg", { width: "32", height: "32", viewBox: "0 0 32 32", fill: "none", xmlns: "http://www.w3.org/2000/svg" }, React.createElement("path", { d: "M22 16C22 19.3137 19.3137 22 16 22C12.6863 22 10 19.3137 10 16C10 12.6863 12.6863 10 16 10C19.3137 10 22 12.6863 22 16Z", stroke: "white", strokeWidth: "2" }), React.createElement("path", { d: "M16 22V28", stroke: "white", strokeWidth: "2", strokeLinecap: "round" }), React.createElement("path", { d: "M16 10V4", stroke: "white", strokeWidth: "2", strokeLinecap: "round" }), React.createElement("path", { d: "M10 16H4", stroke: "white", strokeWidth: "2", strokeLinecap: "round" }), React.createElement("path", { d: "M28 16H22", stroke: "white", strokeWidth: "2", strokeLinecap: "round" }), React.createElement("path", { d: "M19.5356 19.5355L23.0711 23.071", stroke: "white", strokeWidth: "2", strokeLinecap: "round" }), React.createElement("path", { d: "M8.92891 8.92891L12.4644 12.4644", stroke: "white", strokeWidth: "2", strokeLinecap: "round" }), React.createElement("path", { d: "M19.5356 12.4644L23.0711 8.92891", stroke: "white", strokeWidth: "2", strokeLinecap: "round" }), React.createElement("path", { d: "M8.92891 23.071L12.4644 19.5355", stroke: "white", strokeWidth: "2", strokeLinecap: "round" }), React.createElement("circle", { cx: "16", cy: "16", r: "2", fill: "white" }));
-      const UploadIcon = () => React.createElement("svg", { className: "mx-auto h-12 w-12 text-gray-400", stroke: "currentColor", fill: "none", viewBox: "0 0 48 48", "aria-hidden": "true" }, React.createElement("path", { d: "M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }));
-      const DataIcon = () => React.createElement("svg", { className: "mx-auto h-12 w-12 text-gray-400", fill: "none", viewBox: "0 0 48 48", stroke: "currentColor", "aria-hidden": "true" }, React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M9 17v-2m3 2v-4m3 4v-6m2-4H7a2 2 0 00-2 2v16a2 2 0 002 2h16a2 2 0 002-2V7a2 2 0 00-2-2h-4.586a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 0012.586 3H11a1 1 0 00-1 1v1z"}));
-      const DownloadIcon = () => React.createElement("svg", { className: "h-5 w-5", xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" }, React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" }));
-      const SaveIcon = () => React.createElement("svg", { className: "h-5 w-5", xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" }, React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M5 13l4 4L19 7" }));
-      const EditIcon = () => React.createElement("svg", { className: "h-6 w-6", xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" }, React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L16.732 3.732z" }));
-      const ViewIcon = () => React.createElement("svg", { className: "h-6 w-6", xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" }, React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M15 12a3 3 0 11-6 0 3 3 0 016 0z" }), React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" }));
-      const CloseIcon = () => React.createElement("svg", { className: "h-6 w-6", xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" }, React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M6 18L18 6M6 6l12 12" }));
-      const CloseEditorIcon = () => React.createElement("svg", { className: "h-5 w-5", xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" }, React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: "2", d: "M10 19l-7-7m0 0l7-7m-7 7h18" }));
-      const DeleteIcon = () => React.createElement("svg", { className: "h-6 w-6", xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" }, React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" }));
-      const CombineIcon = () => React.createElement("svg", { className: "h-5 w-5", xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" }, React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" }));
-      const LoadingSpinner = ({ className = '' }) => React.createElement("svg", { className: `animate-spin h-8 w-8 text-red-600 ${className}`, xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24" }, React.createElement("circle", { className: "opacity-25", cx: "12", cy: "12", r: "10", stroke: "currentColor", strokeWidth: "4" }), React.createElement("path", { className: "opacity-75", fill: "currentColor", d: "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" }));
-      const SparklesIcon = () => React.createElement("svg", { className: "h-5 w-5", xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" }, React.createElement("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M10 21l-3-3m0 0l-3-3m3 3l3-3m-3 3l3 3M14 3l3 3m0 0l3 3m-3-3l-3 3m3-3l-3-3m6 11.5a.5.5 0 01.5-.5h2a.5.5 0 010 1h-2a.5.5 0 01-.5-.5zM3 11.5a.5.5 0 01.5-.5h2a.5.5 0 010 1h-2a.5.5 0 01-.5-.5z" }));
-      const NewPaintBucketIcon = () => React.createElement("svg", { className: "h-5 w-5 text-gray-700", xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 20 20", fill: "currentColor" }, React.createElement("path", { d: "M3.143 4.522a1.25 1.25 0 011.06-.522h11.602a1.25 1.25 0 011.054.516l.89 1.484a.625.625 0 01-.529 1.004H2.782a.625.625 0 01-.528-1.004l.889-1.484z" }), React.createElement("path", { fillRule: "evenodd", d: "M3.81 9.065a.625.625 0 01.618.533l.403 2.296.143.815c.13.738.745 1.291 1.49 1.291h7.072c.745 0 1.36-.553 1.49-1.29l.143-.815.402-2.296a.625.625 0 01.618-.533h.25a.625.625 0 01.533.618l-.403 2.296-.143.815a2.75 2.75 0 01-2.73 2.457H6.05a2.75 2.75 0 01-2.73-2.456l-.143-.815-.402-2.296a.625.625 0 01.533-.618h.25z", clipRule: "evenodd" }));
-      const PngIcon = () => React.createElement("svg", { className: "h-5 w-5", xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor"}, React.createElement("path", { strokeLinecap:"round", strokeLinejoin:"round", strokeWidth:2, d:"M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l-1-1a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" }));
-      const SvgIcon = () => React.createElement("svg", { className: "h-5 w-5", xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor"}, React.createElement("path", { strokeLinecap:"round", strokeLinejoin:"round", strokeWidth:2, d:"M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" }));
-      const CommentIcon = () => React.createElement("svg", { className: "h-5 w-5", xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 20 20", fill: "currentColor"}, React.createElement("path", { fillRule:"evenodd", d:"M10 2a8 8 0 100 16 8 8 0 000-16zM2 10a8 8 0 1116 0 8 8 0 01-16 0zm7.25-2.75a.75.75 0 00-1.5 0v4.5a.75.75 0 001.5 0v-4.5zM10 12.25a.75.75 0 000 1.5h.01a.75.75 0 000-1.5H10z", clipRule:"evenodd"}));
-      const DataIconSvgString = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5v-1.5M1.125 6.75v11.25c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125V6.75m-19.5 0a1.125 1.125 0 011.125-1.125h17.25c.621 0 1.125.504 1.125 1.125m-19.5 0v-1.5c0-.621.504-1.125 1.125-1.125h17.25c.621 0 1.125.504 1.125 1.125v1.5m-6.375 0v-1.5a1.125 1.125 0 00-1.125-1.125H10.5a1.125 1.125 0 00-1.125 1.125v1.5" /></svg>';
-
-      // --- UTILS ---
-      const wrapHtmlForIframe = (htmlContent) => {
-        if (!htmlContent) return '';
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(htmlContent, 'text/html');
-        let bodyContent = doc.body.innerHTML;
-
-        const styleTag = doc.head.querySelector('style');
-        const scriptTag = doc.head.querySelector('script');
-        
-        let headContent = '';
-        if (styleTag) headContent += styleTag.outerHTML;
-        if (scriptTag) headContent += scriptTag.outerHTML;
-
-        headContent += `
-          <style>
-            /* Robust scrolling for oversized content */
-            html, body {
-              margin: 0;
-              padding: 0;
-              box-sizing: border-box;
-            }
-            body {
-              overflow: auto; /* The key property: add scrollbars IF needed */
-              padding: 1rem; /* A little space is nice */
-            }
-          </style>
-        `;
-        return `<!DOCTYPE html><html><head>${headContent}</head><body>${bodyContent}</body></html>`;
-      };
-
-      // --- DOWNLOADER ---
-      function createDownloadLink(blob, filename) {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }
-      const downloadHtml = (htmlContent, filename) => {
-        if (!htmlContent) {
-          alert("Nessun contenuto disponibile per il download.");
-          return;
+    <script>
+      // Simulate process.env for the browser environment as per user request
+      window.process = {
+        env: {
+          API_KEY: 'AIzaSyAUpMnG760HSOV7rah2UwkOajoH3aD4OFs'
         }
-        const blob = new Blob([htmlContent], { type: 'text/html' });
-        createDownloadLink(blob, filename);
       };
-      const downloadCombinedHtml = (artworks, filename) => {
-        const bodyContent = artworks.map((art) => {
-            const escapedContent = art.htmlContent.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            return `
-              <section class="artwork-section">
-                <h2 class="section-title">${art.title}</h2>
-                <iframe srcdoc="${escapedContent}" class="artwork-iframe" sandbox="allow-scripts" loading="lazy"></iframe>
-              </section>
-            `;
-        }).join('');
-        const fullHtml = `
-          <!DOCTYPE html>
-          <html lang="it">
-            <head>
-              <meta charset="UTF-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>Creazioni Combinate</title>
-              <style>
-                html { scroll-behavior: smooth; }
-                body {
-                  background-color: #e5e7eb;
-                  color: #1f2937;
-                  font-family: sans-serif;
-                  margin: 0;
-                  scroll-snap-type: y mandatory;
-                }
-                .artwork-section {
-                  width: 100vw;
-                  height: 100vh;
-                  display: flex;
-                  flex-direction: column;
-                  align-items: center;
-                  justify-content: center;
-                  scroll-snap-align: start;
-                  box-sizing: border-box;
-                  padding: 2rem;
-                  border-bottom: 2px solid #d1d5db;
-                }
-                .section-title {
-                  font-size: 1.5rem;
-                  font-weight: bold;
-                  margin-bottom: 1rem;
-                  text-align: center;
-                }
-                .artwork-iframe {
-                  width: 100%;
-                  height: 100%;
-                  border: 1px solid #d1d5db;
-                  border-radius: 0.5rem;
-                  background-color: white;
-                }
-              </style>
-            </head>
-            <body>${bodyContent}</body>
-          </html>
-        `;
-        const blob = new Blob([fullHtml], { type: 'text/html' });
-        createDownloadLink(blob, filename);
-      };
+    </script>
+    <script type="text/babel" data-type="module">
+        import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+        import ReactDOM from 'react-dom/client';
+        import { GoogleGenAI, Type } from "@google/genai";
 
-      // --- AI & FILE PROCESSING ---
-      const fileToGenerativePart = async (file) => {
-        const base64EncodedDataPromise = new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            if (reader.result) {
-              resolve(reader.result.split(',')[1]);
-            } else {
-              reject(new Error("Lettura del file non riuscita."));
-            }
-          };
-          reader.onerror = (err) => reject(err);
-          reader.readAsDataURL(file);
-        });
-        return { inlineData: { data: await base64EncodedDataPromise, mimeType: file.type } };
-      };
-      
-      const readFileAsText = (file) => {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            if (typeof reader.result === 'string') {
-              resolve(reader.result);
-            } else {
-              reject(new Error("Lettura del file come testo non riuscita."));
-            }
-          };
-          reader.onerror = (err) => reject(err);
-          reader.readAsText(file);
-        });
-      };
-      
-      const fileToDataUrl = (file) => {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            if (reader.result) {
-              resolve(reader.result);
-            } else {
-              reject(new Error("Lettura del file per data URL non riuscita."));
-            }
-          };
-          reader.onerror = (err) => reject(err);
-          reader.readAsDataURL(file);
-        });
-      };
-      
-      const processApiResponse = (response) => {
-        let htmlContent = response.text.trim();
-        const fenceRegex = /^\`\`\`html\s*\n?(.*?)\n?\s*\`\`\`$/s;
-        const match = htmlContent.match(fenceRegex);
-        if (match && match[1]) {
-          htmlContent = match[1].trim();
-        } else if (!htmlContent.trim().toLowerCase().startsWith('<!doctype html>')) {
-          console.error("Raw response from AI:", response.text);
-          throw new Error("La risposta dell'IA non era nel formato HTML previsto.");
-        }
-        return htmlContent;
-      };
-
-      const startImageChat = async (file) => {
-        const apiKey = "AIzaSyAUpMnG760HSOV7rah2UwkOajoH3aD4OFs";
-        if (!apiKey) throw new Error("Chiave API non trovata.");
-        const ai = new GoogleGenAI({ apiKey: apiKey });
-        const imagePart = await fileToGenerativePart(file);
-        const dataUrl = await fileToDataUrl(file);
-        const prompt = `AGISCI COME UN PROGRAMMATORE ESPERTO DI ANALISI DATI. (Definizione di “Ruolo”)
-IN ALLEGATO TROVERAI UNA IMMAGINE DI UNA TABELLA EXCEL O DI UN GRAFICO (Definizione di “Contesto”)
-IL TUO COMPITO E’ DI RIPRODURRE L’IMMAGINE CHE TROVI IN ALLEGATO COME UNA PRESENTAZIONE INTERATTIVA RIPRODUCENDO FEDELMENTE: I DATI, I COLORI ECC. MI RACCOMANDO NON MODIFICARE E NON ALTERARE NESSUN DATO. DEVE ESSERE UNA RAPPRESENTAZIONE INTERATTIVA FEDELE E COERENTE CON L’IMMAGINE IN ALLEGATO. (Definizione di “Regole”). Segui scrupolosamente i seguenti requisiti tecnici: ID per modifiche (es. data-editable-id="bar-q1"), attributo data-value, e uno script di aggiornamento dinamico con una funzione updateGraph(). Restituisci esclusivamente il codice HTML completo, racchiuso in un blocco markdown.`;
-        const chat = ai.chats.create({ model: 'gemini-2.5-flash-preview-04-17', config: { temperature: 0.0 } });
-        const response = await chat.sendMessage({ message: [{ text: prompt }, imagePart] });
-        const htmlContent = processApiResponse(response);
-        return { htmlContent, dataUrl, chat };
-      };
-      
-      const startDataChat = async (fileContent, fileType) => {
-        const apiKey = "AIzaSyAUpMnG760HSOV7rah2UwkOajoH3aD4OFs";
-        if (!apiKey) throw new Error("Chiave API non trovata.");
-        const ai = new GoogleGenAI({ apiKey: apiKey });
-        const prompt = `Agisci come un esperto di data visualization. Ti fornisco dei dati in formato ${fileType}. Il tuo compito è creare il miglior grafico interattivo possibile per rappresentare questi dati.
-        **Dati:**
-        \`\`\`${fileType.toLowerCase()}
-        ${fileContent}
-        \`\`\`
-        **Istruzioni:**
-        1. Analizza i dati e scegli un tipo di grafico appropriato (preferibilmente a barre, a linee o a torta).
-        2. Se i dati hanno intestazioni, usale per le etichette e il titolo del grafico.
-        3. Genera un codice HTML completo che includa CSS e JavaScript, seguendo **tutti i requisiti tecnici** che conosci (data-editable-id, data-value, funzione updateGraph(), tooltip CSS).
-        4. Restituisci esclusivamente il codice HTML completo nel formato markdown consueto.`;
-        const chat = ai.chats.create({ model: 'gemini-2.5-flash-preview-04-17', config: { temperature: 0.1 } });
-        const response = await chat.sendMessage({ message: prompt });
-        const htmlContent = processApiResponse(response);
-        const dataUrl = 'data:image/svg+xml;base64,' + btoa(DataIconSvgString);
-        return { htmlContent, dataUrl, chat };
-      };
-
-      // --- COMPONENTS ---
-      const Header = () => React.createElement("header", { className: "bg-red-600 sticky top-0 z-40 shadow-lg" }, React.createElement("div", { className: "container mx-auto px-4 sm:px-6 lg:px-8" }, React.createElement("div", { className: "flex items-center justify-between h-16" }, React.createElement("div", { className: "flex items-center space-x-3" }, React.createElement(LogoIcon, null), React.createElement("span", { className: "font-bold text-xl text-white" }, "Graph.AI")))));
-      
-      const InputUploader = ({ onFileUpload, isLoading }) => {
-        const [mode, setMode] = useState('image'); // 'image' or 'data'
-        const [file, setFile] = useState(null);
-        const [fileName, setFileName] = useState('');
-        const fileInputRef = useRef(null);
-
-        const handleFileChange = (event) => {
-            const selectedFile = event.target.files?.[0];
-            if (selectedFile) {
-                setFile(selectedFile);
-                setFileName(selectedFile.name);
-            }
-        };
-
-        const handleDrop = (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            const droppedFile = event.dataTransfer.files?.[0];
-            if (droppedFile) {
-                const isImage = droppedFile.type.startsWith('image/');
-                const isData = ['.csv', '.json'].some(ext => droppedFile.name.endsWith(ext));
-                if ((mode === 'image' && isImage) || (mode === 'data' && isData)) {
-                    setFile(droppedFile);
-                    setFileName(droppedFile.name);
-                } else {
-                    alert(`File non valido per la modalità "${mode}".`);
-                }
-            }
-        };
-        const handleDragOver = (event) => { event.preventDefault(); event.stopPropagation(); };
-
-        const handleSubmit = (event) => {
-            event.preventDefault();
-            if (file) { onFileUpload(file); }
-        };
-        
-        const resetInput = () => {
-            setFile(null);
-            setFileName('');
-            if(fileInputRef.current) fileInputRef.current.value = "";
-        };
-
-        const renderUploader = () => {
-            const isImageMode = mode === 'image';
-            const acceptedFiles = isImageMode ? "image/*" : ".csv, .json, text/csv, application/json";
-            const promptText = isImageMode 
-                ? "Trascina un'immagine, o fai clic per caricare" 
-                : "Trascina un file CSV o JSON, o fai clic";
-            const icon = isImageMode ? React.createElement(UploadIcon, null) : React.createElement(DataIcon, null);
-
-            return React.createElement("form", { onSubmit: handleSubmit, className: "space-y-6" }, 
-                React.createElement("div", null, 
-                    React.createElement("label", { htmlFor: "file-upload", className: "relative block w-full border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-red-500 transition-colors", onDrop: handleDrop, onDragOver: handleDragOver }, 
-                        React.createElement("div", { className: "flex flex-col items-center" }, 
-                            icon, 
-                            React.createElement("span", { className: "mt-2 block text-sm font-semibold text-gray-700" }, fileName || promptText), 
-                            React.createElement("span", { className: "text-xs text-gray-500" }, isImageMode ? "PNG, JPG, GIF" : "CSV, JSON")
-                        ), 
-                        React.createElement("input", { ref: fileInputRef, id: "file-upload", name: "file-upload", type: "file", className: "sr-only", accept: acceptedFiles, onChange: handleFileChange })
-                    )
-                ), 
-                React.createElement("button", { type: "submit", disabled: !file || isLoading, className: "w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 focus:ring-offset-gray-100 disabled:bg-red-400 disabled:cursor-not-allowed transition-all" }, 
-                    isLoading ? 'Elaborazione in corso...' : 'Crea'
-                )
-            );
-        };
-
-        return React.createElement("div", { className: "w-full bg-white p-6 md:p-8 rounded-xl shadow-lg border border-gray-200" },
-            React.createElement("div", { className: "mb-4 border-b border-gray-200" },
-                React.createElement("nav", { className: "-mb-px flex space-x-6", "aria-label": "Tabs" },
-                    React.createElement("button", { 
-                        onClick: () => { setMode('image'); resetInput(); }, 
-                        className: `whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${mode === 'image' ? 'border-red-500 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`
-                    }, "Da Immagine"),
-                    React.createElement("button", { 
-                        onClick: () => { setMode('data'); resetInput(); }, 
-                        className: `whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${mode === 'data' ? 'border-red-500 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`
-                    }, "Da Dati (CSV/JSON)")
-                )
-            ),
-            renderUploader()
-        );
-      };
-
-      const FullScreenViewer = ({ artwork, onClose }) => {
-        if (!artwork) return null;
-        const iframeContent = useMemo(() => wrapHtmlForIframe(artwork.htmlContent), [artwork.htmlContent]);
-        return React.createElement("div", { className: "fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 transition-opacity duration-300", onClick: onClose, "aria-modal": "true", role: "dialog" }, React.createElement("div", { className: "relative w-full max-w-7xl h-[90vh] bg-white rounded-lg shadow-2xl flex flex-col", onClick: (e) => e.stopPropagation() }, React.createElement("div", { className: "flex justify-between items-center p-4 border-b border-gray-200" }, React.createElement("h3", { className: "text-lg font-bold text-gray-800 truncate", title: artwork.title }, artwork.title), React.createElement("button", { onClick: onClose, className: "p-2 text-gray-500 hover:text-red-600 rounded-full hover:bg-gray-100 transition-colors", "aria-label": "Chiudi visualizzazione" }, React.createElement(CloseIcon, null))), React.createElement("div", { className: "flex-grow w-full h-full rounded-b-lg overflow-hidden" }, React.createElement("iframe", { srcDoc: iframeContent, title: artwork.title, className: "w-full h-full border-0", sandbox: "allow-scripts" }))));
-      };
-      
-      const ArtGallery = ({ artworks, onDelete, onRename, onView, onEdit, onReorder }) => {
-        const [selectedIds, setSelectedIds] = useState(new Set());
-        const [editingId, setEditingId] = useState(null);
-        const [editingTitle, setEditingTitle] = useState('');
-        const dragId = useRef(null);
-        
-        const handleSelect = (id) => setSelectedIds(prev => {
-            const newSet = new Set(prev);
-            newSet.has(id) ? newSet.delete(id) : newSet.add(id);
-            return newSet;
-        });
-
-        const selectedArtworks = useMemo(() => {
-            const selectedSet = new Set(selectedIds);
-            return artworks.filter(art => selectedSet.has(art.id));
-        }, [artworks, selectedIds]);
-
-        const handleCombineAndDownload = () => { if (selectedArtworks.length > 0) downloadCombinedHtml(selectedArtworks, `creazioni-combinate-${Date.now()}.html`); };
-        const handleStartEditing = (art) => { setEditingId(art.id); setEditingTitle(art.title); };
-        const handleRename = () => { if (editingId !== null && editingTitle.trim() !== '') onRename(editingId, editingTitle.trim()); setEditingId(null); setEditingTitle(''); };
-        const handleKeyDown = (event) => { if (event.key === 'Enter') handleRename(); else if (event.key === 'Escape') { setEditingId(null); setEditingTitle(''); } };
-        
-        const handleDragStart = (e, id) => { dragId.current = id; e.dataTransfer.effectAllowed = 'move'; };
-        const handleDragOver = (e) => { e.preventDefault(); };
-        const handleDrop = (e, targetId) => {
-            e.preventDefault();
-            if (dragId.current && dragId.current !== targetId) {
-                onReorder(dragId.current, targetId);
-            }
-            dragId.current = null;
-        };
-
-        if (artworks.length === 0) return React.createElement("div", { className: "w-full bg-white p-6 md:p-8 rounded-xl shadow-lg border border-gray-200" }, React.createElement("p", { className: "text-center text-gray-500 py-8" }, "Le tue creazioni salvate appariranno qui."));
-
-        return React.createElement("div", { className: "w-full bg-white p-6 md:p-8 rounded-xl shadow-lg border border-gray-200" }, React.createElement("div", { className: "flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4" }, React.createElement("h3", { className: "text-xl font-bold text-gray-900" }, "Galleria"), React.createElement("button", { onClick: handleCombineAndDownload, disabled: selectedArtworks.length < 2, className: "inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 focus:ring-offset-white disabled:bg-gray-400 disabled:cursor-not-allowed transition-all" }, React.createElement(CombineIcon, null), React.createElement("span", { className: "ml-2" }, `Combina & Scarica (${selectedArtworks.length})`))), React.createElement("div", { className: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6" }, artworks.map(art => React.createElement("div", { key: art.id, draggable: "true", onDragStart: (e) => handleDragStart(e, art.id), onDragOver: handleDragOver, onDrop: (e) => handleDrop(e, art.id), className: "relative group bg-gray-50 rounded-lg overflow-hidden border border-gray-200 shadow-sm flex flex-col cursor-move" }, React.createElement("div", { className: "absolute top-2 right-2 z-10 bg-white/50 backdrop-blur-sm rounded-md" }, React.createElement("input", { type: "checkbox", checked: selectedIds.has(art.id), onChange: () => handleSelect(art.id), className: "h-5 w-5 rounded text-red-600 bg-gray-100 border-gray-300 focus:ring-red-500" })), React.createElement("div", { className: "relative" }, React.createElement("img", { src: art.thumbnail, alt: art.title, className: "w-full h-40 object-cover pointer-events-none" }), React.createElement("div", { className: "absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-x-2" }, React.createElement("button", { onClick: () => onView(art), className: "text-white p-2 rounded-full bg-black/40 hover:bg-black/70 transition-colors", title: "Visualizza" }, React.createElement(ViewIcon, null)), React.createElement("button", { onClick: () => onEdit(art), className: "text-white p-2 rounded-full bg-black/40 hover:bg-black/70 transition-colors", title: "Modifica" }, React.createElement(EditIcon, null)), React.createElement("button", { onClick: () => onDelete(art.id), className: "text-white p-2 rounded-full bg-black/40 hover:bg-black/70 transition-colors", title: "Elimina" }, React.createElement(DeleteIcon, null)))), React.createElement("div", { className: "p-3 flex-grow flex flex-col justify-between" }, editingId === art.id ? React.createElement("div", { className: "flex items-center gap-2" }, React.createElement("input", { type: "text", value: editingTitle, onChange: (e) => setEditingTitle(e.target.value), onKeyDown: handleKeyDown, onBlur: handleRename, className: "text-sm font-medium text-gray-800 w-full border-gray-300 rounded-md shadow-sm p-1", autoFocus: true }), React.createElement("button", { onClick: handleRename, className: "text-gray-500 hover:text-green-600 p-1" }, React.createElement(SaveIcon, null))) : React.createElement("div", { className: "flex items-center justify-between gap-2" }, React.createElement("p", { className: "text-sm font-medium text-gray-800 truncate", title: art.title }, art.title), React.createElement("button", { onClick: () => handleStartEditing(art), className: "text-gray-400 hover:text-red-600 p-1 opacity-0 group-hover:opacity-100 transition-opacity" }, React.createElement(EditIcon, { className: "h-5 w-5" }))))))));
-      };
-
-      const UnifiedGraphEditor = ({ title, dataGroups, onTitleChange, onElementChange }) => {
-        if (!title && (!dataGroups || dataGroups.length === 0)) return React.createElement("p", { className: "text-sm text-gray-500 text-center" }, "Nessun elemento modificabile trovato.");
-        
-        return React.createElement("div", { className: "space-y-4" },
-          title && React.createElement("details", { className: "bg-gray-50 border border-gray-200 rounded-lg p-3", open: true },
-            React.createElement("summary", { className: "font-semibold text-gray-800 cursor-pointer" }, "Titolo"),
-            React.createElement("input", {
-              type: "text",
-              id: "graph-title",
-              value: title,
-              onChange: (e) => onTitleChange(e.target.value),
-              className: "mt-2 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-2"
-            })
-          ),
-          dataGroups.map(group => React.createElement("details", { key: group.name, className: "bg-gray-50 border border-gray-200 rounded-lg p-3 open:shadow-lg", open: true },
-            React.createElement("summary", { className: "font-semibold text-gray-800 cursor-pointer" }, group.displayName),
-            React.createElement("div", { className: "mt-4 space-y-3" },
-              group.elements.map(el => React.createElement("div", { key: el.id, className: "grid grid-cols-1 md:grid-cols-6 gap-2 items-center" },
-                React.createElement("input", {
-                  type: "text",
-                  value: el.label,
-                  onChange: (e) => onElementChange(el.id, 'label', e.target.value),
-                  className: "col-span-1 md:col-span-3 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-1.5",
-                  "aria-label": `Etichetta per ${el.id}`
-                }),
-                React.createElement("input", {
-                  type: "number",
-                  value: el.value,
-                  onChange: (e) => onElementChange(el.id, 'value', e.target.value),
-                  className: "col-span-1 md:col-span-2 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm p-1.5",
-                  "aria-label": `Valore per ${el.id}`
-                }),
-                React.createElement("div", { className: "relative col-span-1 md:col-span-1 h-8 w-full" },
-                    React.createElement("input", {
-                        type: "color",
-                        value: el.color || '#000000',
-                        onChange: (e) => onElementChange(el.id, 'color', e.target.value),
-                        className: "absolute inset-0 w-full h-full opacity-0 cursor-pointer",
-                        "aria-label": `Colore per ${el.id}`
-                    }),
-                    React.createElement("div", { 
-                        className: "w-full h-full border border-gray-300 rounded-md flex items-center justify-center pointer-events-none",
-                        style: { backgroundColor: el.color || '#000000' }
-                    },
-                    React.createElement(NewPaintBucketIcon, null)
-                  )
-                )
-              ))
-            )
-          ))
-        );
-      };
-      
-      const GraphTypeChanger = ({ onRefine, isRefining }) => {
-          const graphTypes = [
-              { key: 'pie', name: 'Grafico a Torta' },
-              { key: 'bar', name: 'Grafico a Barre' },
-              { key: 'line', name: 'Grafico a Linee' }
-          ];
-          const basePrompt = "Analizzando il codice HTML corrente, estrai i dati (etichette e valori) e trasforma il grafico attuale in un [CHART_TYPE]. Mantieni gli stessi colori e dati, ma adatta la struttura HTML e lo script di aggiornamento. Riproduci tutti gli attributi `data-editable-id` e `data-value` necessari per il nuovo formato, e assicurati che l'interattività hover con tooltip funzioni.";
-          
-          const handleClick = (type) => {
-              const prompt = basePrompt.replace('[CHART_TYPE]', `grafico a ${type === 'pie' ? 'torta' : type === 'bar' ? 'barre' : 'linee'}`);
-              onRefine(prompt);
-          };
-
-          return React.createElement("div", { className: "flex flex-wrap gap-3" },
-              graphTypes.map(type => React.createElement("button", {
-                  key: type.key,
-                  onClick: () => handleClick(type.key),
-                  disabled: isRefining,
-                  className: "flex-1 text-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:bg-gray-200 disabled:cursor-not-allowed"
-              }, type.name))
-          );
-      };
-
-      const InteractiveArtDisplay = ({ htmlContent, onSave, onRefine, onAnalyze, isRefining, isAnalyzing, analysisResult, onHtmlChange, onClose }) => {
-        const [refinementPrompt, setRefinementPrompt] = useState('');
-        const [editorGroups, setEditorGroups] = useState([]);
-        const [graphTitle, setGraphTitle] = useState('');
-        const iframeRef = useRef(null);
-
-        const iframeContent = useMemo(() => wrapHtmlForIframe(htmlContent), [htmlContent]);
-
-        useEffect(() => {
-          if (!htmlContent) { setEditorGroups([]); setGraphTitle(''); return; }
-          try {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(htmlContent, 'text/html');
-            
-            const titleNode = doc.querySelector('[data-editable-id="title"]');
-            setGraphTitle(titleNode ? titleNode.textContent.trim() : '');
-
-            const visualElements = doc.querySelectorAll('[data-value]');
-            const tempGroups = {};
-            const friendlyNames = { bar: 'Dati Barre', slice: 'Dati Fette', point: 'Dati Punti' };
-
-            visualElements.forEach(node => {
-                const id = node.getAttribute('data-editable-id');
-                if (!id) return;
-                
-                const baseId = id.substring(id.indexOf('-') + 1);
-                const groupKey = Object.keys(friendlyNames).find(key => id.startsWith(key)) || 'data';
-                
-                if (!tempGroups[groupKey]) {
-                    tempGroups[groupKey] = { displayName: friendlyNames[groupKey] || 'Altri Dati', elements: [] };
-                }
-                
-                const value = node.dataset.value;
-                const color = node.style.backgroundColor || node.style.fill || (node.getAttribute && node.getAttribute('fill')) || '#000000';
-                const labelNode = doc.querySelector(`[data-editable-id="label-${baseId}"]`);
-                const label = labelNode ? labelNode.textContent.trim() : baseId;
-
-                tempGroups[groupKey].elements.push({ id: baseId, label, value, color });
-            });
-            
-            setEditorGroups(Object.entries(tempGroups).map(([name, data]) => ({ name, ...data })));
-
-          } catch (e) {
-            console.error("Errore durante l'analisi dell'HTML per l'editor:", e);
-            setEditorGroups([]);
-            setGraphTitle('');
-          }
-        }, [htmlContent]);
-
-        const updateHtmlAndTriggerRefresh = (updater) => {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(htmlContent, 'text/html');
-            updater(doc);
-            const scriptTag = doc.querySelector('script');
-            if (scriptTag) {
-                scriptTag.textContent += '\nif (typeof updateGraph === "function") { updateGraph(); }';
-            }
-            onHtmlChange(doc.documentElement.outerHTML);
-        }
-
-        const handleTitleChange = useCallback((newTitle) => {
-            updateHtmlAndTriggerRefresh(doc => {
-                const node = doc.querySelector(`[data-editable-id="title"]`);
-                if (node) node.textContent = newTitle;
-            });
-        }, [htmlContent, onHtmlChange]);
-
-        const handleElementChange = useCallback((baseId, property, newValue) => {
-            updateHtmlAndTriggerRefresh(doc => {
-                const visualNode = doc.querySelector(`[data-editable-id$="-${baseId}"]`);
-                if (!visualNode) return;
-                
-                if (property === 'label') {
-                    const node = doc.querySelector(`[data-editable-id="label-${baseId}"]`);
-                    if (node) node.textContent = newValue;
-                } else if (property === 'value') {
-                    visualNode.dataset.value = newValue;
-                } else if (property === 'color') {
-                    visualNode.style.backgroundColor = newValue;
-                    visualNode.style.fill = newValue;
-                    if (visualNode.hasAttribute('fill')) {
-                        visualNode.setAttribute('fill', newValue);
+        const fileToBase64 = (file) => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => {
+                    const result = reader.result;
+                    const base64String = result.split(',')[1];
+                    if (base64String) {
+                        resolve(base64String);
+                    } else {
+                        reject(new Error("Failed to read file as Base64 string."));
                     }
-                }
+                };
+                reader.onerror = (error) => reject(error);
             });
-        }, [htmlContent, onHtmlChange]);
-
-        const handleSave = useCallback(() => {
-            onSave(htmlContent);
-            onClose(); 
-        }, [htmlContent, onSave, onClose]);
-        
-        const handleDownloadHTML = useCallback(() => downloadHtml(htmlContent, `grafico-interattivo-${Date.now()}.html`), [htmlContent]);
-        const handleRefineClick = useCallback(() => { if (refinementPrompt.trim()) onRefine(refinementPrompt); }, [refinementPrompt, onRefine]);
-        
-        const handleExport = (format) => {
-            const iframe = iframeRef.current;
-            if (!iframe || !iframe.contentWindow || !iframe.contentWindow.document.body) {
-                alert("Impossibile accedere al contenuto del grafico per l'esportazione.");
-                return;
-            }
-            const targetElement = iframe.contentWindow.document.body.firstChild; // Target the first child, which is the actual chart container
-            if (!targetElement) {
-                alert("Contenuto del grafico non trovato.");
-                return;
-            }
-
-            const filename = `grafico-${Date.now()}`;
-
-            if (format === 'png') {
-                html2canvas(targetElement, {
-                    backgroundColor: null, 
-                    useCORS: true,
-                    logging: false
-                }).then(canvas => {
-                    const link = document.createElement('a');
-                    link.download = `${filename}.png`;
-                    link.href = canvas.toDataURL('image/png');
-                    link.click();
-                });
-            } else if (format === 'svg') {
-                const svgElement = targetElement.querySelector('svg');
-                if (svgElement) {
-                    const serializer = new XMLSerializer();
-                    const svgString = serializer.serializeToString(svgElement);
-                    const blob = new Blob([svgString], {type: "image/svg+xml"});
-                    createDownloadLink(blob, `${filename}.svg`);
-                } else {
-                    alert("Esportazione SVG non disponibile: nessun elemento SVG trovato nel grafico. Prova a esportare come PNG.");
-                }
-            }
         };
 
-        const buttonClasses = "w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 focus:ring-offset-white transition-all disabled:bg-red-400";
-        const secondaryButtonClasses = "w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50";
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-        return React.createElement("div", { className: "flex h-[calc(100vh-4rem)]" },
-          React.createElement("aside", { className: "w-96 flex-shrink-0 bg-white border-r border-gray-200 h-full overflow-y-auto p-6 space-y-8" },
-             React.createElement("div", { className: "space-y-4" },
-                React.createElement("h3", { className: "text-xl font-bold text-gray-900" }, "Pannello di Controllo"),
-                React.createElement("button", { onClick: onClose, className: "w-full flex items-center justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50" }, React.createElement(CloseEditorIcon, null), React.createElement("span", { className: "ml-2" }, "Chiudi e torna alla Galleria")),
-                React.createElement(UnifiedGraphEditor, { title: graphTitle, dataGroups: editorGroups, onTitleChange: handleTitleChange, onElementChange: handleElementChange })
-             ),
-             React.createElement("div", { className: "border-t pt-6 space-y-4" },
-                React.createElement("h4", {className: "text-lg font-semibold text-gray-800 mb-3"}, "Trasforma Grafico"),
-                React.createElement(GraphTypeChanger, { onRefine: onRefine, isRefining: isRefining })
-             ),
-             React.createElement("div", { className: "border-t border-gray-200 pt-6 space-y-4" },
-                React.createElement("h4", { className: "text-lg font-semibold text-gray-800" }, "Affina con IA (Avanzato)"),
-                React.createElement("textarea", { value: refinementPrompt, onChange: (e) => setRefinementPrompt(e.target.value), disabled: isRefining, placeholder: "Es: 'aggiungi un'ombreggiatura alle barre'", className: "w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-red-500 focus:border-red-500 transition-colors disabled:bg-gray-100", rows: 2 }),
-                React.createElement("button", { onClick: handleRefineClick, disabled: isRefining || !refinementPrompt.trim(), className: "w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-800 hover:bg-gray-900" },
-                  isRefining ? React.createElement(LoadingSpinner, { className: 'h-5 w-5' }) : React.createElement(SparklesIcon, null), React.createElement("span", { className: "ml-2" }, isRefining ? "Affinamento..." : "Affina con IA"))
-             ),
-             React.createElement("div", { className: "border-t border-gray-200 pt-6 space-y-4" },
-                React.createElement("h4", { className: "text-lg font-semibold text-gray-800" }, "Analisi Grafico con IA"),
-                React.createElement("button", { onClick: onAnalyze, disabled: isAnalyzing, className: "w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700" },
-                  isAnalyzing ? React.createElement(LoadingSpinner, { className: 'h-5 w-5' }) : React.createElement(CommentIcon, null), React.createElement("span", { className: "ml-2" }, isAnalyzing ? "Analisi in corso..." : "Genera Commento")),
-                analysisResult && React.createElement("div", { className: "p-3 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700 whitespace-pre-wrap" }, analysisResult)
-             ),
-             React.createElement("div", { className: "border-t border-gray-200 pt-6 flex flex-col gap-4" },
-                React.createElement("button", { onClick: handleSave, className: buttonClasses, disabled: isRefining }, React.createElement(SaveIcon, null), React.createElement("span", { className: "ml-2" }, "Salva e Chiudi")),
-                React.createElement("button", { onClick: handleDownloadHTML, className: secondaryButtonClasses, disabled: isRefining }, React.createElement(DownloadIcon, null), React.createElement("span", { className: "ml-2" }, "Scarica HTML")),
-                React.createElement("button", { onClick: () => handleExport('png'), className: secondaryButtonClasses, disabled: isRefining }, React.createElement(PngIcon, null), React.createElement("span", { className: "ml-2" }, "Esporta come PNG"))
-             )
-          ),
-          React.createElement("main", { className: "flex-grow bg-gray-100" },
-            React.createElement("iframe", { ref: iframeRef, key: htmlContent, srcDoc: iframeContent, title: "Anteprima Arte Interattiva", className: "w-full h-full border-0", sandbox: "allow-scripts allow-same-origin" })
-          )
-        );
-      };
-      
-      // --- APP ---
-      const App = () => {
-        const [editingArtworkId, setEditingArtworkId] = useState(null);
-        const [htmlContent, setHtmlContent] = useState(null);
-        const [originalImage, setOriginalImage] = useState(null);
-        const [artworks, setArtworks] = useState(() => {
-            try {
-                const savedArtworks = localStorage.getItem('graph-ai-artworks');
-                return savedArtworks ? JSON.parse(savedArtworks) : [];
-            } catch (error) {
-                console.error("Failed to load artworks from localStorage", error);
-                return [];
+        const DATA_EXTRACTION_PROMPT = `You are an expert data analyst. Your task is to analyze the provided image of a chart or table and extract its data into a structured JSON format. You must also identify the primary colors used in the visualization.
+
+The output MUST be a single JSON object that strictly adheres to the provided JSON schema. Do not add any extra text, explanations, or markdown formatting around the JSON.`;
+
+        const DATA_EXTRACTION_SCHEMA = {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING, description: 'The main title of the chart or table.' },
+            chartType: { type: Type.STRING, description: 'Type of visualization (e.g., "bar", "line", "pie", "table").' },
+            data: {
+              type: Type.ARRAY,
+              description: 'The data points for the visualization. For tables, this will be an array of row arrays.',
+              items: {
+                type: Type.OBJECT,
+                description: 'A single data point or row.',
+                properties: {
+                  label: { type: Type.STRING, description: 'The label for this data point (e.g., an x-axis category or a row identifier).' },
+                  values: {
+                    type: Type.ARRAY,
+                    description: 'The numerical values associated with this label. Usually one value, but can be more for grouped charts.',
+                    items: { type: Type.NUMBER }
+                  }
+                }
+              }
+            },
+            seriesLabels: {
+              type: Type.ARRAY,
+              description: 'Labels for the data series, if more than one. E.g., ["Sales 2023", "Sales 2024"]',
+              items: { type: Type.STRING }
+            },
+            colors: {
+              type: Type.ARRAY,
+              description: 'An array of dominant hex color codes found in the chart\'s data elements (bars, lines, pie slices). Example: ["#34D399", "#A78BFA"]',
+              items: { type: Type.STRING }
             }
-        });
-        const [isLoading, setIsLoading] = useState(false);
-        const [isRefining, setIsRefining] = useState(false);
-        const [isAnalyzing, setIsAnalyzing] = useState(false);
-        const [analysisResult, setAnalysisResult] = useState("");
-        const [error, setError] = useState(null);
-        const [artIdCounter, setArtIdCounter] = useState(() => {
-            const savedCounter = localStorage.getItem('graph-ai-counter');
-            return savedCounter ? parseInt(savedCounter, 10) : 0;
-        });
-        const [viewingArtwork, setViewingArtwork] = useState(null);
-        const [chat, setChat] = useState(null);
-        
-        useEffect(() => {
-            try {
-                localStorage.setItem('graph-ai-artworks', JSON.stringify(artworks));
-                localStorage.setItem('graph-ai-counter', artIdCounter.toString());
-            } catch (error) {
-                console.error("Failed to save to localStorage", error);
-            }
-        }, [artworks, artIdCounter]);
+          },
+          required: ["title", "chartType", "data", "colors"]
+        };
 
-        const getChat = useCallback(() => {
-          if (chat) return chat;
-          const apiKey = "AIzaSyAUpMnG760HSOV7rah2UwkOajoH3aD4OFs";
-          const ai = new GoogleGenAI({ apiKey });
-          const newChat = ai.chats.create({ model: 'gemini-2.5-flash-preview-04-17', config: { temperature: 0.1 } });
-          setChat(newChat);
-          return newChat;
-        }, [chat]);
-        
-        const handleFileUpload = useCallback(async (file) => {
-          setIsLoading(true);
-          setError(null);
-          setHtmlContent(null);
-          setOriginalImage(null);
-          setChat(null);
-          setEditingArtworkId(null);
-          setAnalysisResult("");
+        const HTML_GENERATION_PROMPT = `**ROLE**: You are an expert web developer specializing in creating beautiful, interactive data visualizations with HTML, CSS, and JavaScript.
 
+**TASK**: Generate a single, self-contained HTML file that visualizes the data provided in the user's message.
+
+**INPUT**: The user will provide a JSON object containing:
+1.  \`data\`: The structured data for the visualization (e.g., chart data, table rows).
+2.  \`colors\`: A color palette to be used for the visualization elements.
+3.  \`chartType\`: The type of chart to create.
+4.  \`title\`: The title for the visualization.
+5.  (Optional) An image of the original chart for layout and style reference.
+
+**REQUIREMENTS**:
+- Create an interactive visualization (e.g., with hover tooltips) using the provided \`data\`.
+- The visualization type must match the \`chartType\`.
+- **Strictly use the colors from the \`colors\` array for the data elements (bars, lines, pie slices, etc.).**
+- The generated code must be a single HTML file with embedded \`<style>\` and \`<script>\` tags. Use a modern, clean, and professional design.
+- Use CDN-hosted libraries like Chart.js or D3.js if necessary for the visualization.
+- The output must be **only the HTML code**. Start directly with \`<!DOCTYPE html>\` and do not include any markdown fences (\`\`\`html) or explanations.
+- Ensure the visualization is responsive and well-designed.`;
+
+        const AI_CODE_MODIFICATION_PROMPT = `You are an expert web developer AI assistant. Your task is to modify the provided HTML code based on the user's request.
+- You MUST only change the specific elements, styles, or scripts mentioned by the user.
+- You MUST maintain the overall structure and functionality of the code.
+- You MUST NOT alter any other part of the code.
+- You MUST NOT add any new libraries (like jQuery, D3.js, etc.) unless explicitly asked by the user.
+- Your output MUST be ONLY the complete, updated HTML code.
+- Start your response directly with \`<!DOCTYPE html>\`.
+- Do NOT include any explanations, comments, or markdown formatting (like \`\`\`html\`) around the code.`;
+
+        const extractDataFromImage = async (base64Image, mimeType) => {
           try {
-            let result;
-            if(file.type.startsWith('image/')) {
-                result = await startImageChat(file);
-            } else if (['.csv', '.json'].some(ext => file.name.endsWith(ext))) {
-                const fileContent = await readFileAsText(file);
-                const fileType = file.name.endsWith('.csv') ? 'CSV' : 'JSON';
-                result = await startDataChat(fileContent, fileType);
-            } else {
-                throw new Error("Tipo di file non supportato. Carica un'immagine, un CSV o un JSON.");
-            }
-
-            setHtmlContent(result.htmlContent);
-            setOriginalImage(result.dataUrl);
-            setChat(result.chat);
-          } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Si è verificato un errore sconosciuto.';
-            setError(`Impossibile elaborare il file. ${errorMessage}`);
-            console.error(err);
-          } finally {
-            setIsLoading(false);
-          }
-        }, []);
-        
-        const handleRefine = useCallback(async (refinementPrompt) => {
-          if (!refinementPrompt) return;
-          setIsRefining(true);
-          setError(null);
-          try {
-            const activeChat = getChat();
-            const fullRefinementPrompt = `Basandoti sul seguente codice HTML, applica questa modifica: "${refinementPrompt}". Il codice è: \`\`\`html\n${htmlContent}\n\`\`\`. Restituisci solo il codice HTML completo e aggiornato nel solito formato markdown. Non aggiungere commenti.`;
-            const response = await activeChat.sendMessage({ message: fullRefinementPrompt });
-            const newHtmlContent = processApiResponse(response);
-            setHtmlContent(newHtmlContent);
-          } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Si è verificato un errore sconosciuto.';
-            setError(`Impossibile affinare la creazione. ${errorMessage}`);
-            console.error(err);
-          } finally {
-            setIsRefining(false);
-          }
-        }, [getChat, htmlContent]);
-        
-        const handleAnalyze = useCallback(async () => {
-          setIsAnalyzing(true);
-          setAnalysisResult("");
-          setError(null);
-          try {
-            const activeChat = getChat();
-            const prompt = `Agisci come un analista di dati esperto. Analizza il seguente codice HTML che rappresenta un grafico o una tabella e fornisci un breve commento sui dati mostrati. Concentrati sui punti salienti, i valori massimi o minimi, o eventuali pattern interessanti. Sii conciso e professionale. Ecco il codice: \`\`\`html\n${htmlContent}\n\`\`\``;
-            const response = await activeChat.sendMessage({ message: prompt });
-            setAnalysisResult(response.text.trim());
-          } catch (err) {
-             const errorMessage = err instanceof Error ? err.message : 'Si è verificato un errore sconosciuto.';
-             setError(`Impossibile analizzare il grafico. ${errorMessage}`);
-          } finally {
-            setIsAnalyzing(false);
-          }
-        }, [getChat, htmlContent]);
-
-        const handleSaveArtwork = useCallback((artHtml, idToUpdate) => {
-            if (idToUpdate !== null) {
-                setArtworks(prev => prev.map(art => 
-                    art.id === idToUpdate ? { ...art, htmlContent: artHtml } : art
-                ));
-            } else {
-                if (!originalImage) return;
-                const newArtwork = { id: artIdCounter, thumbnail: originalImage, htmlContent: artHtml, title: `Creazione ${artIdCounter + 1}` };
-                setArtworks(prev => [newArtwork, ...prev]);
-                setArtIdCounter(prev => prev + 1);
-            }
-        }, [originalImage, artIdCounter]);
-
-        const handleCloseEditor = useCallback(() => {
-            setHtmlContent(null);
-            setOriginalImage(null);
-            setChat(null);
-            setEditingArtworkId(null);
-            setAnalysisResult("");
-        }, []);
-        
-        const handleDeleteArtwork = useCallback((id) => setArtworks(prev => prev.filter(art => art.id !== id)), []);
-        const handleRenameArtwork = useCallback((id, newTitle) => setArtworks(prev => prev.map(art => art.id === id ? { ...art, title: newTitle } : art)), []);
-        
-        const handleReorderArtworks = useCallback((draggedId, targetId) => {
-            setArtworks(prev => {
-                const newArtworks = [...prev];
-                const draggedIndex = newArtworks.findIndex(art => art.id === draggedId);
-                const targetIndex = newArtworks.findIndex(art => art.id === targetId);
-                if (draggedIndex === -1 || targetIndex === -1) return prev;
-                const [draggedItem] = newArtworks.splice(draggedIndex, 1);
-                newArtworks.splice(targetIndex, 0, draggedItem);
-                return newArtworks;
+            const imagePart = { inlineData: { data: base64Image, mimeType } };
+            const response = await ai.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: { parts: [imagePart, { text: DATA_EXTRACTION_PROMPT }] },
+              config: {
+                responseMimeType: "application/json",
+                responseSchema: DATA_EXTRACTION_SCHEMA,
+              },
             });
-        }, []);
-        
-        const handleEditArtwork = useCallback((artwork) => {
-            setEditingArtworkId(artwork.id);
-            setHtmlContent(artwork.htmlContent);
-            setOriginalImage(artwork.thumbnail);
-            setChat(null);
-            setAnalysisResult("");
-        }, []);
+            const jsonString = response.text.trim();
+            return JSON.parse(jsonString);
+          } catch (error) {
+            console.error("Error extracting data from image:", error);
+            const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+            throw new Error(`Error calling Gemini API for data extraction: ${errorMessage}`);
+          }
+        };
 
-        if (htmlContent) {
-            return React.createElement("div", { className: "min-h-screen bg-gray-100 text-gray-800 font-sans" },
-                React.createElement(Header, null),
-                React.createElement(InteractiveArtDisplay, {
-                    htmlContent: htmlContent,
-                    onSave: (artHtml) => handleSaveArtwork(artHtml, editingArtworkId),
-                    onRefine: handleRefine,
-                    onAnalyze: handleAnalyze,
-                    isRefining: isRefining,
-                    isAnalyzing: isAnalyzing,
-                    analysisResult: analysisResult,
-                    onHtmlChange: setHtmlContent,
-                    onClose: handleCloseEditor
-                })
-            );
-        }
+        const generateHtmlFromData = async (editedData, base64Image, mimeType) => {
+          try {
+            const imagePart = { inlineData: { data: base64Image, mimeType: mimeType } };
+            const textPart = { text: `${HTML_GENERATION_PROMPT}\n\nHere is the data to visualize:\n\`\`\`json\n${JSON.stringify(editedData, null, 2)}\n\`\`\`` };
+            const response = await ai.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: { parts: [textPart, imagePart] },
+            });
+            const htmlContent = response.text;
+            const cleanedHtml = htmlContent.replace(/^```html\s*|```\s*$/g, '').trim();
+            if (!cleanedHtml.toLowerCase().startsWith('<!doctype html')) {
+                return `<!DOCTYPE html><html><head><title>Generated Content</title><style>body { font-family: sans-serif; padding: 20px; }</style></head><body><p>The model did not return valid HTML. Response:</p><pre>${cleanedHtml}</pre></body></html>`;
+            }
+            return cleanedHtml;
+          } catch (error) {
+            console.error("Error generating HTML from data:", error);
+            const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+            return `Error calling Gemini API: ${errorMessage}`;
+          }
+        };
+
+        const chatWithAiToModifyCode = async (currentHtml, userRequest) => {
+          try {
+            const prompt = `${AI_CODE_MODIFICATION_PROMPT}\n\nHere is the user's request: "${userRequest}"\n\nHere is the current HTML code to modify:\n\`\`\`html\n${currentHtml}\n\`\`\``;
+            const response = await ai.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: prompt,
+            });
+            const modifiedHtml = response.text;
+            const cleanedHtml = modifiedHtml.replace(/^```html\s*|```\s*$/g, '').trim();
+            if (!cleanedHtml.toLowerCase().startsWith('<!doctype html')) {
+              throw new Error("The AI did not return a valid HTML document.");
+            }
+            return cleanedHtml;
+          } catch (error) {
+            console.error("Error modifying HTML with AI:", error);
+            const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+            throw new Error(`Error calling Gemini API for code modification: ${errorMessage}`);
+          }
+        };
+
+        const Icon = (props) => ( <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-5 h-5 ${props.className || ''}`} > {props.children} </svg> );
+        const ArrowUpTrayIcon = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" /></Icon> );
+        const EyeIcon = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></Icon> );
+        const CodeBracketIcon = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 12" /></Icon> );
+        const ArrowDownTrayIcon = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></Icon> );
+        const ClipboardIcon = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a2.25 2.25 0 0 1-2.25 2.25H9.75A2.25 2.25 0 0 1 7.5 4.5v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" /></Icon> );
+        const CheckIcon = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></Icon> );
+        const TrashIcon = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></Icon> );
+        const ChartBarIcon = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" /></Icon> );
+        const SparklesIcon = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.898 20.572 16.5 21.75l-.398-1.178a3.375 3.375 0 0 0-2.455-2.456L12.75 18l1.178-.398a3.375 3.375 0 0 0 2.455-2.456L16.5 14.25l.398 1.178a3.375 3.375 0 0 0 2.456 2.456L20.25 18l-1.178.398a3.375 3.375 0 0 0-2.456 2.456Z" /></Icon> );
+        const PlusIcon = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></Icon> );
+        const XMarkIcon = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></Icon> );
+        const BookmarkSquareIcon = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 3.75V16.5L12 14.25L7.5 16.5V3.75m9 0H7.5A2.25 2.25 0 0 0 5.25 6v13.5A2.25 2.25 0 0 0 7.5 21.75h9A2.25 2.25 0 0 0 18.75 19.5V6A2.25 2.25 0 0 0 16.5 3.75Z" /></Icon> );
+        const RectangleStackIcon = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v12a2.25 2.25 0 0 0 2.25 2.25Z" /></Icon> );
+        const SlidersHorizontalIcon = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" /></Icon> );
+        const ArrowTopRightOnSquareIcon = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></Icon> );
+        const ArrowPathIcon = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 11.667 0l3.181-3.183m-4.991-2.696v4.992h-4.992m0 0-3.181-3.183a8.25 8.25 0 0 1 11.667 0l3.181 3.183" /></Icon> );
+        const PencilIcon = (props) => ( <Icon {...props}><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></Icon> );
         
-        return React.createElement("div", { className: "min-h-screen bg-gray-100 text-gray-800 font-sans" }, 
-            React.createElement(Header, null), 
-            React.createElement("main", { className: "container mx-auto p-4 md:p-8" }, 
-                React.createElement("div", { className: "max-w-4xl mx-auto space-y-12" }, 
-                    React.createElement("div", { className: "text-center" }, 
-                        React.createElement("h2", { className: "text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl" }, "Graph.AI"), 
-                        React.createElement("p", { className: "mt-4 text-lg leading-8 text-gray-600" }, "Trasforma i tuoi dati e le tue immagini in presentazioni interattive")
-                    ), 
-                    React.createElement(InputUploader, { onFileUpload: handleFileUpload, isLoading: isLoading }), 
-                    isLoading && React.createElement("div", { className: "flex flex-col items-center justify-center p-8 bg-white/50 rounded-lg" }, 
-                        React.createElement(LoadingSpinner, null), 
-                        React.createElement("p", { className: "mt-4 text-gray-600" }, "Il tuo sviluppatore frontend AI personale sta creando la tua opera...")
-                    ), 
-                    error && React.createElement("div", { className: "text-center text-red-700 bg-red-100 p-4 rounded-md" }, error), 
-                    React.createElement(ArtGallery, { artworks: artworks, onDelete: handleDeleteArtwork, onRename: handleRenameArtwork, onView: setViewingArtwork, onEdit: handleEditArtwork, onReorder: handleReorderArtworks })
-                )
-            ), 
-            React.createElement(FullScreenViewer, { artwork: viewingArtwork, onClose: () => setViewingArtwork(null) })
-        );
-      };
-      
-      // --- RENDER ---
-      const rootElement = document.getElementById('root');
-      if (!rootElement) {
-        throw new Error("Could not find root element to mount to");
-      }
-      const root = ReactDOM.createRoot(rootElement);
-      root.render(React.createElement(App, null));
+        const Loader = () => { return (<svg className="animate-spin h-10 w-10 text-brand-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" > <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" ></circle> <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" ></path> </svg> ); };
+
+        const Dropzone = ({ onFileDrop, isLoading }) => {
+            const [isDragging, setIsDragging] = useState(false);
+            const fileInputRef = useRef(null);
+            const handleDragEnter = useCallback((e) => { e.preventDefault(); e.stopPropagation(); if (!isLoading) setIsDragging(true); }, [isLoading]);
+            const handleDragLeave = useCallback((e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }, []);
+            const handleDragOver = useCallback((e) => { e.preventDefault(); e.stopPropagation(); }, []);
+            const handleDrop = useCallback((e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); if (isLoading) return; const files = e.dataTransfer.files; if (files && files.length > 0) { onFileDrop(files[0]); } }, [isLoading, onFileDrop]);
+            const handleClick = () => { if (!isLoading) { fileInputRef.current?.click(); } };
+            const handleFileChange = (e) => { const files = e.target.files; if (files && files.length > 0) { onFileDrop(files[0]); } };
+            const baseClasses = "w-full h-full flex flex-col items-center justify-center p-8 rounded-lg border-2 border-dashed transition-colors duration-300 cursor-pointer";
+            const idleClasses = "border-brand-border hover:border-brand-primary hover:bg-brand-border/20";
+            const draggingClasses = "border-brand-primary bg-brand-primary/10";
+            return ( <div className={`${baseClasses} ${isDragging ? draggingClasses : idleClasses}`} onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} onDragOver={handleDragOver} onDrop={handleDrop} onClick={handleClick} > <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" disabled={isLoading} /> <div className="text-center"> <ArrowUpTrayIcon className="mx-auto h-12 w-12 text-brand-text-secondary" /> <p className="mt-4 text-lg font-semibold text-brand-text">Drop your image here</p> <p className="text-sm text-brand-text-secondary">or click to browse</p> <p className="mt-2 text-xs text-brand-text-secondary/70">Supports PNG, JPG, GIF, WEBP</p> </div> </div> );
+        };
+
+        const CodeDisplay = ({ code, onCodeChange }) => {
+            const [copied, setCopied] = useState(false);
+            const handleCopy = () => { navigator.clipboard.writeText(code).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }).catch(err => { console.error('Failed to copy text: ', err); }); };
+            return ( <div className="relative h-full bg-gray-900/70 rounded-b-lg"> <button onClick={handleCopy} className="absolute top-2 right-2 p-2 rounded-md bg-brand-border/50 text-brand-text-secondary hover:bg-brand-border hover:text-brand-text transition-colors z-10" aria-label="Copy code" > {copied ? <CheckIcon /> : <ClipboardIcon />} </button> <textarea value={code} onChange={(e) => onCodeChange(e.target.value)} spellCheck="false" aria-label="HTML Code Editor" className="w-full h-full resize-none border-0 bg-transparent p-4 font-mono text-sm text-white focus:ring-0" /> </div> );
+        };
+
+        const CustomizationPanel = ({ data, onDataChange, onApplyChanges, isGenerating, hasAppliedChanges, }) => {
+            const handleFieldChange = (field, value) => { onDataChange({ ...data, [field]: value }); };
+            const handleDataChange = (rowIndex, field, value, valueIndex) => { const newData = [...data.data]; if (field === 'label') { newData[rowIndex].label = value; } else if (typeof valueIndex !== 'undefined') { newData[rowIndex].values[valueIndex] = parseFloat(value) || 0; } onDataChange({ ...data, data: newData }); };
+            const handleAddRow = () => { const numValues = data.seriesLabels?.length || 1; const newRow = { label: 'New Label', values: Array(numValues).fill(0) }; onDataChange({ ...data, data: [...data.data, newRow] }); };
+            const handleRemoveRow = (rowIndex) => { const newData = data.data.filter((_, i) => i !== rowIndex); onDataChange({ ...data, data: newData }); };
+            const handleColorChange = (index, newColor) => { const newColors = [...data.colors]; newColors[index] = newColor; onDataChange({ ...data, colors: newColors }); };
+            const handleAddColor = () => { const newColors = [...data.colors, '#CCCCCC']; onDataChange({ ...data, colors: newColors }); };
+            const handleRemoveColor = (index) => { const newColors = data.colors.filter((_, i) => i !== index); onDataChange({ ...data, colors: newColors }); };
+            return ( <div className="flex flex-col h-full"> <div className="space-y-4 flex-grow overflow-y-auto p-4 pr-2"> <fieldset className="space-y-2" disabled={isGenerating}> <legend className="text-sm font-medium text-brand-text-secondary mb-1">General</legend> <div> <label htmlFor="title-editor" className="block text-xs font-medium text-brand-text-secondary/80 mb-1">Title</label> <input id="title-editor" type="text" value={data.title} onChange={(e) => handleFieldChange('title', e.target.value)} className="w-full bg-brand-bg border border-brand-border rounded-md px-2 py-1.5 text-sm focus:ring-1 focus:ring-brand-primary focus:border-brand-primary" /> </div> <div> <label htmlFor="chart-type-editor" className="block text-xs font-medium text-brand-text-secondary/80 mb-1">Chart Type</label> <select id="chart-type-editor" value={data.chartType} onChange={(e) => handleFieldChange('chartType', e.target.value)} className="w-full bg-brand-bg border border-brand-border rounded-md px-2 py-1.5 text-sm focus:ring-1 focus:ring-brand-primary focus:border-brand-primary" > <option value="bar">Bar Chart</option> <option value="line">Line Chart</option> <option value="pie">Pie Chart</option> <option value="table">Table</option> </select> </div> </fieldset> <fieldset className="space-y-2" disabled={isGenerating}> <legend className="text-sm font-medium text-brand-text-secondary mb-1">Color Palette</legend> <div className="flex flex-wrap gap-2"> {data.colors.map((color, index) => ( <div key={index} className="flex items-center space-x-1.5 bg-brand-bg p-1 pr-2 border border-brand-border rounded-md"> <input type="color" value={color} onChange={(e) => handleColorChange(index, e.target.value)} className="w-5 h-5 rounded border-none bg-transparent cursor-pointer" /> <span className="font-mono text-xs text-brand-text-secondary">{color.toUpperCase()}</span> <button onClick={() => handleRemoveColor(index)} className="text-brand-text-secondary hover:text-red-400"><TrashIcon className="w-3.5 h-3.5"/></button> </div> ))} <button onClick={handleAddColor} className="flex items-center space-x-1 text-sm text-brand-text-secondary hover:text-brand-text bg-brand-bg px-2 py-1 border border-brand-border rounded-md"><PlusIcon className="w-4 h-4" /><span>Add</span></button> </div> </fieldset> <fieldset disabled={isGenerating}> <legend className="text-sm font-medium text-brand-text-secondary mb-1">Data</legend> <div className="space-y-2"> {data.data.map((row, rowIndex) => ( <div key={rowIndex} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center bg-brand-bg p-1.5 border border-brand-border rounded-md"> <input type="text" value={row.label} onChange={e => handleDataChange(rowIndex, 'label', e.target.value)} placeholder="Label" className="bg-gray-800/60 border border-brand-border/50 rounded px-2 py-1 text-sm w-full"/> <div className="flex items-center gap-2"> {row.values.map((val, valIndex) => ( <input key={valIndex} type="number" value={val} onChange={e => handleDataChange(rowIndex, 'value', e.target.value, valIndex)} className="bg-gray-800/60 border border-brand-border/50 rounded px-2 py-1 text-sm w-full"/> ))} </div> <button onClick={() => handleRemoveRow(rowIndex)} className="text-brand-text-secondary hover:text-red-400 px-1"><TrashIcon /></button> </div> ))} </div> <button onClick={handleAddRow} className="mt-2 flex items-center space-x-1.5 text-sm text-brand-text-secondary hover:text-brand-text bg-brand-bg px-2.5 py-1.5 border border-brand-border rounded-md w-full justify-center"><PlusIcon className="w-4 h-4"/><span>Add Data Row</span></button> </fieldset> </div> <div className="flex-shrink-0 p-3 border-t border-brand-border"> <button onClick={onApplyChanges} disabled={isGenerating || hasAppliedChanges} className="w-full flex items-center justify-center space-x-2 bg-brand-primary text-white px-4 py-2 rounded-md font-medium hover:bg-brand-primary-hover transition-colors disabled:bg-brand-border disabled:text-brand-text-secondary disabled:cursor-not-allowed" > <ArrowPathIcon className={isGenerating ? 'animate-spin' : ''} /> <span>{isGenerating ? 'Applying...' : 'Apply & Regenerate Preview'}</span> </button> </div> </div> );
+        };
+
+        const GalleryItemCard = ({ item, isSelected, onSelect, onDelete, onLoad, onRename }) => {
+            const [isRenaming, setIsRenaming] = useState(false);
+            const [title, setTitle] = useState(item.title);
+            const inputRef = useRef(null);
+            useEffect(() => { if (isRenaming) { inputRef.current?.focus(); inputRef.current?.select(); } }, [isRenaming]);
+            const handleRename = () => { if (title.trim() && title.trim() !== item.title) { onRename(item.id, title.trim()); } else { setTitle(item.title); } setIsRenaming(false); };
+            const handleDelete = (e) => { e.stopPropagation(); onDelete(item.id); };
+            const handleMainClick = () => { if (!isRenaming) { onLoad(item); } };
+            const handleDoubleClick = (e) => { e.stopPropagation(); setIsRenaming(true); };
+            const handleKeydown = (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); handleMainClick(); } }
+            return ( <div className="relative group bg-brand-surface border border-brand-border rounded-lg overflow-hidden transition-all duration-300 hover:border-brand-primary hover:shadow-lg hover:shadow-brand-primary/10 focus-within:border-brand-primary cursor-pointer" onClick={handleMainClick} onKeyDown={handleKeydown} role="button" tabIndex={0} aria-label={`Load ${item.title}`} > <div className="absolute top-2 right-2 z-10 flex items-center gap-2"> <input type="checkbox" checked={isSelected} onChange={(e) => onSelect(item.id, e.target.checked)} className="form-checkbox h-5 w-5 rounded bg-brand-bg border-brand-border text-brand-primary focus:ring-brand-primary cursor-pointer" onClick={(e) => e.stopPropagation()} aria-label={`Select ${item.title}`} /> <button onClick={handleDelete} className="p-1.5 bg-red-600/80 text-white rounded-full opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-red-600 transition-opacity" aria-label={`Delete ${item.title}`} > <TrashIcon className="w-4 h-4" /> </button> </div> <div> <img src={`data:image/png;base64,${item.originalImageBase64}`} alt={item.title} className="w-full h-40 object-cover bg-gray-900/50" loading="lazy" /> <div className="p-3" onDoubleClick={handleDoubleClick}> {isRenaming ? ( <input ref={inputRef} type="text" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={handleRename} onKeyDown={(e) => { if (e.key === 'Enter') handleRename(); if (e.key === 'Escape') setIsRenaming(false); }} onClick={(e) => e.stopPropagation()} className="w-full bg-brand-bg border border-brand-primary rounded-md px-2 py-1 text-sm focus:ring-1 focus:ring-brand-primary" /> ) : ( <h3 className="font-semibold text-brand-text truncate flex items-center" title={item.title}> <span className="truncate">{item.title}</span> <PencilIcon className="w-3 h-3 ml-2 text-transparent group-hover:text-brand-text-secondary transition-colors" /> </h3> )} <p className="text-xs text-brand-text-secondary mt-1"> {new Date(item.createdAt).toLocaleDateString()} </p> </div> </div> {isSelected && <div className="absolute inset-0 border-2 border-brand-primary rounded-lg pointer-events-none" aria-hidden="true" />} </div> );
+        };
+
+        const Gallery = ({ items, isOpen, onClose, onDelete, onCombine, onLoad, onRename }) => {
+            const [sortBy, setSortBy] = useState('date-desc');
+            const [selectedIds, setSelectedIds] = useState(new Set());
+            const handleSelect = (id, isSelected) => { setSelectedIds(prev => { const newSet = new Set(prev); if (isSelected) { newSet.add(id); } else { newSet.delete(id); } return newSet; }); };
+            const handleCombineClick = () => { onCombine(selectedIds); setSelectedIds(new Set()); onClose(); };
+            const handleClose = () => { setSelectedIds(new Set()); onClose(); }
+            const sortedItems = useMemo(() => { return [...items].sort((a, b) => { switch (sortBy) { case 'date-asc': return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(); case 'title-asc': return a.title.localeCompare(b.title); case 'title-desc': return b.title.localeCompare(a.title); case 'date-desc': default: return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); } }); }, [items, sortBy]);
+            if (!isOpen) return null;
+            return ( <div className="fixed inset-0 bg-brand-bg/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" aria-modal="true" role="dialog" onClick={handleClose}> <div className="bg-brand-surface w-full h-full max-w-6xl flex flex-col rounded-lg shadow-2xl border border-brand-border" onClick={e => e.stopPropagation()}> <header className="flex-shrink-0 flex items-center justify-between p-4 border-b border-brand-border"> <h2 className="text-xl font-bold text-brand-text">My Gallery</h2> <div className="flex items-center gap-4"> <div className="flex items-center gap-2"> <label htmlFor="sort-by" className="text-sm text-brand-text-secondary">Sort by:</label> <select id="sort-by" value={sortBy} onChange={e => setSortBy(e.target.value)} className="bg-brand-bg border border-brand-border rounded-md px-2 py-1 text-sm focus:ring-1 focus:ring-brand-primary focus:border-brand-primary" > <option value="date-desc">Newest First</option> <option value="date-asc">Oldest First</option> <option value="title-asc">Title (A-Z)</option> <option value="title-desc">Title (Z-A)</option> </select> </div> <button onClick={handleClose} className="text-brand-text-secondary hover:text-brand-text"> <XMarkIcon className="w-6 h-6" /> </button> </div> </header> <main className="flex-grow p-4 overflow-y-auto"> {items.length === 0 ? ( <div className="h-full flex flex-col items-center justify-center text-brand-text-secondary"> <RectangleStackIcon className="w-16 h-16 mb-4" /> <h3 className="text-lg font-semibold">Your gallery is empty</h3> <p>Generate visualizations and save them to see them here.</p> </div> ) : ( <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"> {sortedItems.map(item => ( <GalleryItemCard key={item.id} item={item} isSelected={selectedIds.has(item.id)} onSelect={handleSelect} onDelete={onDelete} onLoad={onLoad} onRename={onRename} /> ))} </div> )} </main> {items.length > 0 && ( <footer className="flex-shrink-0 p-4 border-t border-brand-border flex items-center justify-end"> <button onClick={handleCombineClick} disabled={selectedIds.size === 0} className="flex items-center space-x-2 bg-brand-primary text-white px-4 py-2 rounded-md font-medium hover:bg-brand-primary-hover transition-colors disabled:bg-brand-border disabled:text-brand-text-secondary disabled:cursor-not-allowed" > <ArrowDownTrayIcon /> <span>Save & Download ({selectedIds.size})</span> </button> </footer> )} </div> </div> );
+        };
+
+        const AiChatPanel = ({ history, onSendMessage, isLoading }) => {
+            const [input, setInput] = useState('');
+            const messagesEndRef = useRef(null);
+            const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); };
+            useEffect(() => { scrollToBottom(); }, [history, isLoading]);
+            const handleSubmit = (e) => { e.preventDefault(); if (input.trim() && !isLoading) { onSendMessage(input); setInput(''); } };
+            return ( <div className="h-full flex flex-col"> <div className="flex-grow p-4 space-y-4 overflow-y-auto min-h-0"> {history.map((msg, index) => ( <div key={index} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}> {msg.role === 'assistant' && ( <div className="flex-shrink-0 w-8 h-8 rounded-full bg-brand-primary flex items-center justify-center"> <SparklesIcon className="w-5 h-5 text-white" /> </div> )} <div className={`max-w-xs md:max-w-md lg:max-w-lg px-4 py-2 rounded-lg ${ msg.role === 'user' ? 'bg-brand-primary text-white' : 'bg-brand-surface text-brand-text border border-brand-border' }`} > <p className="text-sm whitespace-pre-wrap">{msg.content}</p> </div> </div> ))} {isLoading && ( <div className="flex items-end gap-2 justify-start"> <div className="flex-shrink-0 w-8 h-8 rounded-full bg-brand-primary flex items-center justify-center"> <SparklesIcon className="w-5 h-5 text-white" /> </div> <div className="max-w-xs md:max-w-md lg:max-w-lg px-4 py-2 rounded-lg bg-brand-surface border border-brand-border flex items-center"> <Loader /> <span className="text-sm ml-2 text-brand-text-secondary">Thinking...</span> </div> </div> )} <div ref={messagesEndRef} /> </div> <div className="flex-shrink-0 p-2 border-t border-brand-border"> <form onSubmit={handleSubmit} className="flex items-center gap-2"> <textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(e); } }} placeholder="e.g., 'Change the bar color to green'" rows={1} className="flex-grow bg-brand-bg border border-brand-border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-brand-primary focus:border-brand-primary resize-none text-brand-text" disabled={isLoading} /> <button type="submit" disabled={isLoading || !input.trim()} className="bg-brand-primary text-white px-4 py-2 rounded-md font-medium hover:bg-brand-primary-hover transition-colors disabled:bg-brand-border disabled:text-brand-text-secondary disabled:cursor-not-allowed" > Send </button> </form> </div> </div> );
+        };
+        
+        const TabButton = ({ icon, label, isActive, onClick }) => ( <button onClick={onClick} className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${ isActive ? 'bg-brand-primary text-white' : 'text-brand-text-secondary hover:bg-brand-border/50 hover:text-brand-text' }`} > {icon} <span className="hidden sm:inline">{label}</span> </button> );
+
+        const App = () => {
+            const [step, setStep] = useState('initial');
+            const [imageFile, setImageFile] = useState(null);
+            const [base64Image, setBase64Image] = useState(null);
+            const [imageUrl, setImageUrl] = useState(null);
+            const [generatedHtml, setGeneratedHtml] = useState(null);
+            const [error, setError] = useState(null);
+            const [activeTab, setActiveTab] = useState('preview');
+            const [leftPanelView, setLeftPanelView] = useState('customize');
+            const [editedData, setEditedData] = useState(null);
+            const [stagedEditedData, setStagedEditedData] = useState(null);
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+            const [notification, setNotification] = useState(null);
+            const [chatHistory, setChatHistory] = useState([]);
+            const [isAiChatLoading, setIsAiChatLoading] = useState(false);
+            const [gallery, setGallery] = useState([]);
+            const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+            const [currentGalleryItemId, setCurrentGalleryItemId] = useState(null);
+
+            const getCombinedItemPlaceholderB64 = () => { const svgString = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="#a0a0a4" class="w-24 h-24"> <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v12a2.25 2.25 0 0 0 2.25 2.25Z" /> </svg>`; return btoa(svgString); };
+            
+            useEffect(() => { try { const savedGallery = localStorage.getItem('data-viz-gallery'); if (savedGallery) { setGallery(JSON.parse(savedGallery)); } } catch (e) { console.error("Failed to load gallery from localStorage", e); } }, []);
+            useEffect(() => { localStorage.setItem('data-viz-gallery', JSON.stringify(gallery)); }, [gallery]);
+            useEffect(() => { if (notification) { const timer = setTimeout(() => setNotification(null), 3000); return () => clearTimeout(timer); } }, [notification]);
+
+            const resetState = useCallback(() => { setStep('initial'); setImageFile(null); setBase64Image(null); if (imageUrl) { URL.revokeObjectURL(imageUrl); } setImageUrl(null); setGeneratedHtml(null); setError(null); setActiveTab('preview'); setLeftPanelView('customize'); setEditedData(null); setStagedEditedData(null); setCurrentGalleryItemId(null); setIsProcessing(false); setIsPreviewLoading(false); setChatHistory([]); setIsAiChatLoading(false); }, [imageUrl]);
+            
+            const handleFileDrop = useCallback(async (file) => {
+                resetState();
+                if (!file.type.startsWith('image/')) { setError("Please drop an image file (PNG, JPG, etc.)."); setStep('error'); return; }
+                setStep('extracting'); setIsProcessing(true); setImageFile(file); const localImageUrl = URL.createObjectURL(file); setImageUrl(localImageUrl);
+                try {
+                    const b64 = await fileToBase64(file); setBase64Image(b64); const extractedResult = await extractDataFromImage(b64, file.type);
+                    setEditedData(extractedResult); setStagedEditedData(extractedResult); setStep('live_editing');
+                } catch (e) { const errorMessage = e instanceof Error ? e.message : "An unknown error occurred during data extraction."; console.error(e); setError(errorMessage); setStep('error'); } finally { setIsProcessing(false); }
+            }, [resetState]);
+            
+            useEffect(() => { const regenerateVisualization = async () => { if (!editedData || !base64Image || !imageFile) return; setIsPreviewLoading(true); try { const html = await generateHtmlFromData(editedData, base64Image, imageFile.type); if (html.toLowerCase().includes("error calling gemini api") || html.toLowerCase().includes("an unknown error occurred")) { setError(html.replace(/<\/?div>|<\/?p>/g, '')); setGeneratedHtml(null); } else { if (generatedHtml === null) { setChatHistory([{ role: 'assistant', content: "I've generated your visualization! You can now customize its data and appearance." }]); } setGeneratedHtml(html); setError(null); } } catch (e) { const errorMessage = e instanceof Error ? e.message : "An unknown error occurred during visualization generation."; console.error(e); setError(errorMessage); setGeneratedHtml(null); } finally { setIsPreviewLoading(false); } }; regenerateVisualization(); }, [editedData, base64Image, imageFile]);
+            
+            const handleApplyCustomizationChanges = () => { if (stagedEditedData) { setEditedData(stagedEditedData); setNotification('Applying changes...'); } };
+            
+            const handleDownload = () => { if (!generatedHtml) return; const blob = new Blob([generatedHtml], { type: 'text/html' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${editedData?.title || 'visualization'}.html`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); };
+            
+            const handleOpenInNewTab = () => { if (!generatedHtml) return; const blob = new Blob([generatedHtml], { type: 'text/html' }); const url = URL.createObjectURL(blob); window.open(url, '_blank', 'noopener,noreferrer'); };
+            
+            const handleSaveOrUpdateGallery = useCallback(() => { if (!generatedHtml || !stagedEditedData || !base64Image) return; setEditedData(stagedEditedData); if (currentGalleryItemId) { setGallery(prev => prev.map(item => item.id === currentGalleryItemId ? { ...item, title: stagedEditedData.title, generatedHtml, editedData: stagedEditedData } : item )); setNotification('Visualization updated in gallery!'); } else { const newItem = { id: `item-${Date.now()}`, title: stagedEditedData.title || 'Untitled Visualization', generatedHtml, originalImageBase64: base64Image, createdAt: new Date().toISOString(), editedData: stagedEditedData, }; setGallery(prev => [newItem, ...prev]); setCurrentGalleryItemId(newItem.id); setNotification('Saved to gallery!'); } }, [generatedHtml, stagedEditedData, base64Image, currentGalleryItemId]);
+            
+            const handleDeleteFromGallery = (id) => { setGallery(prev => prev.filter(item => item.id !== id)); setNotification('Item deleted from gallery.'); };
+            
+            const handleRenameItem = (id, newTitle) => { setGallery(prev => prev.map(item => item.id === id ? { ...item, title: newTitle } : item )); if (id === currentGalleryItemId && stagedEditedData) { setStagedEditedData(prev => prev ? { ...prev, title: newTitle } : null); if (editedData) { setEditedData(prev => prev ? { ...prev, title: newTitle } : null); } } setNotification('Item renamed!'); };
+            
+            const handleLoadFromGallery = useCallback(async (item) => { setIsGalleryOpen(false); resetState(); setStep('extracting'); setIsProcessing(true); await new Promise(resolve => setTimeout(resolve, 200)); try { if (item.isCombined || !item.editedData) { setGeneratedHtml(item.generatedHtml); setBase64Image(item.originalImageBase64); setImageUrl(`data:image/svg+xml;base64,${item.originalImageBase64}`); setEditedData(null); setStagedEditedData(null); setChatHistory([{ role: 'assistant', content: `Loaded "${item.title}". This is a combined dashboard and cannot be edited directly, but you can use the AI Chat to make changes.` }]); } else { const mimeType = 'image/png'; const imageUrl = `data:${mimeType};base64,${item.originalImageBase64}`; const fakeFile = new File([], "loaded.png", { type: mimeType }); setImageFile(fakeFile); setImageUrl(imageUrl); setBase64Image(item.originalImageBase64); setGeneratedHtml(item.generatedHtml); setEditedData(item.editedData); setStagedEditedData(item.editedData); setChatHistory([{ role: 'assistant', content: `Loaded "${item.title}" from your gallery. You can now modify it.` }]); } setCurrentGalleryItemId(item.id); setStep('live_editing'); setActiveTab('preview'); setLeftPanelView('customize'); } catch (e) { const errorMessage = e instanceof Error ? e.message : "An unknown error occurred while loading the item."; console.error(e); setError(errorMessage); setStep('error'); } finally { setIsProcessing(false); } }, [resetState]);
+            
+            const handleCombineItems = (selectedIds) => { const itemsToCombine = gallery.filter(item => selectedIds.has(item.id)).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()); if (itemsToCombine.length === 0) return; const allStyles = new Map(); const allBodySections = []; const allScripts = []; const chartJsCdnUrl = "https://cdn.jsdelivr.net/npm/chart.js"; let chartJsNeeded = false; itemsToCombine.forEach((item, index) => { const uniqueSuffix = `${item.id.replace(/\W/g, '')}-${index}`; const html = item.generatedHtml; const styleMatch = html.match(/<style>([\s\S]*?)<\/style>/i); if (styleMatch?.[1]) { const styleContent = styleMatch[1].trim(); if (!allStyles.has(styleContent)) { allStyles.set(styleContent, styleContent); } } let bodyContent = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)?.[1] || ''; const scriptMatches = [...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/gi)]; let canvasIdUpdated = false; bodyContent = bodyContent.replace(/<canvas id=["']([^"']+)["']/g, (match, originalId) => { const newId = `${originalId}-${uniqueSuffix}`; canvasIdUpdated = true; return `<canvas id="${newId}"`; }); scriptMatches.forEach(scriptMatch => { const scriptAttrs = scriptMatch[1]; let scriptContent = scriptMatch[2]; if (scriptAttrs.includes('src')) { if (scriptAttrs.includes('chart.js')) { chartJsNeeded = true; } return; } if (canvasIdUpdated) { scriptContent = scriptContent.replace(/getElementById\((['"])([^'"]+)\1\)/g, (match, quote, originalId) => { const newId = `${originalId}-${uniqueSuffix}`; return `getElementById(${quote}${newId}${quote})`; }); } allScripts.push(`(function() {\n    try {\n        ${scriptContent}\n    } catch (e) {\n        console.error("Error in chart script for item ${item.id}:", e);\n    }\n})();`); }); allBodySections.push({ title: item.title, content: bodyContent }); }); const combinedStyles = Array.from(allStyles.values()).join('\n\n'); const combinedBody = allBodySections.map(section => `<section class="visualization-container"><h2 class="visualization-title">${section.title}</h2><div class="visualization-content">${section.content}</div></section>`).join(''); const combinedScripts = allScripts.join('\n\n'); const chartJsScriptTag = chartJsNeeded ? `<script src="${chartJsCdnUrl}"><\/script>` : ''; const combinedHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Combined Dashboard</title>${chartJsScriptTag}<style>body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: #f0f2f5; color: #1a1a1a; } main { display: flex; flex-wrap: wrap; justify-content: center; gap: 2rem; padding: 2rem; } .visualization-container { padding: 2rem; background-color: white; border-radius: 12px; box-shadow: 0 6px 12px rgba(0,0,0,0.08); flex: 1 1 550px; min-width: 320px; max-width: 95vw; } .visualization-title { text-align: center; color: #333; margin-top: 0; margin-bottom: 1.5rem; font-size: 1.5em; } .visualization-content { position: relative; min-height: 400px; display: flex; align-items: center; justify-content: center; } canvas { max-width: 100%; height: auto !important; }</style><style>${combinedStyles}</style></head><body><main>${combinedBody}</main><script>${combinedScripts}<\/script></body></html>`; const newCombinedItem = { id: `combined-${Date.now()}`, title: `Combined Dashboard (${itemsToCombine.length} items)`, generatedHtml: combinedHtml, originalImageBase64: getCombinedItemPlaceholderB64(), createdAt: new Date().toISOString(), editedData: null, isCombined: true, }; setGallery(prev => [newCombinedItem, ...prev]); const blob = new Blob([combinedHtml], { type: 'text/html' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'combined_dashboard.html'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); setNotification('Dashboard saved to gallery & downloaded!'); };
+
+            const handleSendMessage = async (message) => { if (!message.trim() || !generatedHtml || isAiChatLoading) return; const newUserMessage = { role: 'user', content: message }; setChatHistory(prev => [...prev, newUserMessage]); setIsAiChatLoading(true); setActiveTab('preview'); try { const updatedHtml = await chatWithAiToModifyCode(generatedHtml, message); setGeneratedHtml(updatedHtml); const assistantMessage = { role: 'assistant', content: "I've updated the visualization based on your request." }; setChatHistory(prev => [...prev, assistantMessage]); } catch (e) { const errorMessage = e instanceof Error ? e.message : "An unknown error occurred."; console.error(e); const assistantErrorMessage = { role: 'assistant', content: `I'm sorry, I encountered an error and couldn't apply your changes.\n\nDetails: ${errorMessage}` }; setChatHistory(prev => [...prev, assistantErrorMessage]); } finally { setIsAiChatLoading(false); } };
+            
+            const hasUnsavedChanges = useMemo(() => { if (!currentGalleryItemId || !stagedEditedData) return false; const currentItemInGallery = gallery.find(item => item.id === currentGalleryItemId); if (!currentItemInGallery?.editedData) return false; return JSON.stringify(stagedEditedData) !== JSON.stringify(currentItemInGallery.editedData); }, [stagedEditedData, currentGalleryItemId, gallery]);
+            const hasAppliedChanges = useMemo(() => { return JSON.stringify(editedData) === JSON.stringify(stagedEditedData); }, [editedData, stagedEditedData]);
+
+            const renderOutput = () => { const showInitialLoader = (step === 'live_editing' && !generatedHtml && isPreviewLoading && !error); if (showInitialLoader) { return <div className="w-full h-full flex flex-col items-center justify-center"><Loader /><p className="mt-4 text-brand-text-secondary">Generating initial visualization...</p></div>; } if (generatedHtml) { const isSaveable = stagedEditedData && !stagedEditedData.title.startsWith("Combined Dashboard"); const saveButtonText = currentGalleryItemId ? (hasUnsavedChanges ? "Update" : "Saved") : "Save"; const isSaveButtonDisabled = !isSaveable || (!!currentGalleryItemId && !hasUnsavedChanges); return ( <div className="relative flex flex-col h-full bg-brand-surface rounded-lg"> <div className="flex-shrink-0 p-2 border-b border-brand-border"> <div className="flex items-center justify-between"> <div className="flex items-center space-x-1 bg-gray-900/50 p-1 rounded-md"> <TabButton icon={<EyeIcon />} label="Preview" isActive={activeTab === 'preview'} onClick={() => setActiveTab('preview')} /> <TabButton icon={<CodeBracketIcon />} label="Code" isActive={activeTab === 'code'} onClick={() => setActiveTab('code')} /> </div> <div className="flex items-center space-x-2"> <button onClick={handleOpenInNewTab} className="p-1.5 rounded-md text-sm font-medium text-brand-text-secondary hover:bg-brand-border hover:text-brand-text transition-colors" title="Open preview in new tab" > <ArrowTopRightOnSquareIcon /> </button> <button onClick={handleSaveOrUpdateGallery} disabled={isSaveButtonDisabled} className="flex items-center space-x-2 bg-gray-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-gray-500 transition-colors disabled:bg-brand-border disabled:text-brand-text-secondary disabled:cursor-not-allowed"> <BookmarkSquareIcon /> <span>{saveButtonText}</span> </button> <button onClick={handleDownload} className="flex items-center space-x-2 bg-brand-primary text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-brand-primary-hover transition-colors"> <ArrowDownTrayIcon /> <span>Download</span> </button> </div> </div> </div> <div className="flex-grow min-h-0"> {activeTab === 'preview' ? ( <iframe srcDoc={generatedHtml} title="Generated HTML Preview" className="w-full h-full border-0" sandbox="allow-scripts allow-same-origin" /> ) : ( <CodeDisplay code={generatedHtml} onCodeChange={setGeneratedHtml} /> )} </div> {isPreviewLoading && ( <div className="absolute inset-0 bg-brand-surface/70 backdrop-blur-sm flex flex-col items-center justify-center z-10 transition-opacity"> <Loader /> <p className="mt-4 text-brand-text-secondary">Updating preview...</p> </div> )} </div> ); } const hasError = (step === 'error' || step === 'live_editing') && error; if (hasError) { return ( <div className="w-full h-full flex flex-col items-center justify-center p-4"> <div className="bg-red-900/20 border border-red-500 text-red-300 p-4 rounded-lg text-center max-w-md"> <h3 className="font-bold mb-2 text-lg">An Error Occurred</h3> <p className="text-sm">{error}</p> </div> </div> ); } return ( <div className="w-full h-full flex flex-col items-center justify-center text-center text-brand-text-secondary p-4"> <ChartBarIcon className="w-16 h-16 mb-4" /> <h3 className="font-bold text-lg text-brand-text">Output Panel</h3> <p>Your interactive visualization will appear here.</p> </div> ); };
+
+            const renderLeftPanel = () => { if (step === 'initial') { return <Dropzone onFileDrop={handleFileDrop} isLoading={isProcessing} />; } if (step === 'extracting') { return ( <div className="w-full h-full flex flex-col items-center justify-center"> <Loader /> <p className="mt-4 text-brand-text-secondary">Extracting data from image...</p> </div> ) } if (imageUrl && (step === 'live_editing' || step === 'error')) { return ( <div className="w-full h-full flex flex-col space-y-4"> <div className="relative flex-shrink-0"> <img src={imageUrl} alt="Uploaded chart" className="max-w-full max-h-[25vh] object-contain rounded-md mx-auto bg-gray-900/20" /> <button onClick={resetState} className="absolute top-2 right-2 flex items-center space-x-2 bg-red-600/80 text-white px-3 py-1.5 rounded-md font-medium hover:bg-red-600 transition-colors text-sm z-10"> <TrashIcon /> </button> </div> <div className="rounded-lg flex-grow flex flex-col min-h-0"> <div className="flex-shrink-0 flex items-center justify-between p-3 bg-brand-surface rounded-t-lg border-b border-brand-border"> <h3 className="text-lg font-semibold text-brand-text"> {leftPanelView === 'customize' ? (stagedEditedData ? 'Customize Visualization' : 'Dashboard View') : 'AI Assistant'} </h3> <div className="flex items-center space-x-1 bg-gray-900/50 p-1 rounded-md"> <TabButton icon={<SlidersHorizontalIcon />} label="Customize" isActive={leftPanelView === 'customize'} onClick={() => setLeftPanelView('customize')} /> <TabButton icon={<SparklesIcon />} label="AI Chat" isActive={leftPanelView === 'ai-chat'} onClick={() => setLeftPanelView('ai-chat')} /> </div> </div> <div className="flex-grow min-h-0 bg-brand-surface rounded-b-lg"> {leftPanelView === 'customize' ? ( stagedEditedData ? ( <CustomizationPanel data={stagedEditedData} onDataChange={setStagedEditedData} onApplyChanges={handleApplyCustomizationChanges} isGenerating={isPreviewLoading} hasAppliedChanges={hasAppliedChanges} /> ) : ( <div className="h-full flex flex-col items-center justify-center p-4 text-center text-brand-text-secondary"> <RectangleStackIcon className="w-12 h-12 mx-auto mb-4" /> <h4 className="font-semibold text-brand-text">Combined Dashboard</h4> <p className="text-sm mt-1">This item cannot be edited directly. You can use the "AI Chat" tab to make modifications, or use the output panel to download or open it in a new tab.</p> </div> ) ) : ( <AiChatPanel history={chatHistory} onSendMessage={handleSendMessage} isLoading={isAiChatLoading} /> )} </div> </div> </div> ); } return <Dropzone onFileDrop={handleFileDrop} isLoading={isProcessing} />; };
+
+            return (
+                <div className="min-h-screen flex flex-col p-4 md:p-6 lg:p-8 space-y-4">
+                    <header className="flex items-center justify-between">
+                        <div className="text-left">
+                            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Data Visualizer AI</h1>
+                            <p className="text-brand-text-secondary mt-2 text-md sm:text-lg">Transform images into editable, interactive web dashboards.</p>
+                        </div>
+                        <button onClick={() => setIsGalleryOpen(true)} className="flex items-center space-x-2 bg-brand-surface text-brand-text px-4 py-2 rounded-lg font-medium hover:bg-brand-border transition-colors border border-brand-border" > <RectangleStackIcon /> <span>My Gallery ({gallery.length})</span> </button>
+                    </header>
+                    <main className="flex-grow grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
+                        <div className="bg-brand-surface rounded-lg p-4 flex flex-col min-h-[50vh] lg:min-h-0"> {renderLeftPanel()} </div>
+                        <div className="min-h-[50vh] lg:min-h-0"> {renderOutput()} </div>
+                    </main>
+                    <Gallery isOpen={isGalleryOpen} items={gallery} onClose={() => setIsGalleryOpen(false)} onDelete={handleDeleteFromGallery} onCombine={handleCombineItems} onLoad={handleLoadFromGallery} onRename={handleRenameItem} />
+                    {notification && ( <div className="fixed bottom-5 right-5 bg-brand-primary text-white px-4 py-2 rounded-lg shadow-lg animate-bounce"> {notification} </div> )}
+                </div>
+            );
+        };
+        
+        const rootElement = document.getElementById('root');
+        if (!rootElement) {
+          throw new Error("Could not find root element to mount to");
+        }
+        const root = ReactDOM.createRoot(rootElement);
+        root.render(<App />);
+
     </script>
   </body>
 </html>
